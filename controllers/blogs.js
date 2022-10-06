@@ -1,20 +1,51 @@
 const router = require('express').Router()
 
-const { Blog } = require('../models')
+const { Blog, User } = require('../models')
+const jwt = require('jsonwebtoken')
 
 const blogFinder = async (req, res, next) => {
+  console.log('etsin blogia id:llä', req.params.id);
   req.blog = await Blog.findByPk(req.params.id)
+  console.log('blogi on', req.blog);
   next()
 }
 
+// 13.10
+const tokenExtractor = (req, res, next) => {
+  const authorization = req.get('authorization')
+  console.log('authaus:', process.env.SECRET);
+
+  if (authorization && authorization.toLowerCase().startsWith('bearer ')) {
+    try {
+      req.decodedToken = jwt.verify(authorization.substring(7), process.env.SECRET)
+    } catch{
+      return res.status(401).json({ error: 'token invalid!' })
+    }
+  }  else {
+    return res.status(401).json({ error: 'token missing!' })
+  }
+  next()
+}
+
+// Task 13.12.
+// Modify the routes for retrieving all blogs and all users so that 
+// each blog shows the user who added it and each user shows the blogs they have added.
 router.get('/', async (req, res) => {
-  const blogs = await Blog.findAll()
+  const blogs = await Blog.findAll({
+    include: { // join query
+      model: User,
+      attributes: { exclude: ['userId'] }
+    }
+  })
   res.json(blogs)
 })
 
-router.post('/', async (req, res, next) => {
+router.post('/', tokenExtractor, async (req, res, next) => {
   try {
-    const blog = await Blog.create(req.body)
+    console.log('decodedtoken: ',req.decodedToken);
+    const user = await User.findByPk(req.decodedToken.id)
+    console.log(user);
+    const blog = await Blog.create({ ...req.body, userId: user.id })
     res.json(blog)
   } catch(error) {
     next(error)
@@ -31,12 +62,30 @@ router.get('/:id', blogFinder, async (req, res) => {
   }
 })
 
-router.delete('/:id', blogFinder, async (req, res) => {
+router.delete('/:id', blogFinder, tokenExtractor, async (req, res, next) => {
   //const blog = await Blog.findByPk(req.params.id)
-  if (req.blog) {
-    await req.blog.destroy()
+  try {
+    console.log('decodedtoken: ',req.decodedToken);
+    console.log('blogi: ',req.blog);
+    /* const user = await User.findByPk(req.decodedToken.id)
+    console.log(user); */
+    if (req.blog && req.blog.userId === req.decodedToken.id) {
+      console.log('okei!');
+      await req.blog.destroy()
+      /* if (req.blog) {
+        await req.blog.destroy()
+      } */
+      res.status(204).end()
+    }
+    else {
+      console.log('eipä ollu!');
+      res.status(400).end()
+    }
+    
+  } catch(error) {
+    next(error)
+    //return res.status(400).json({ error })
   }
-  res.status(204).end()
 })
 
 router.put('/:id', blogFinder, async (req, res, next) => {
