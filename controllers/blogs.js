@@ -1,7 +1,10 @@
 const router = require('express').Router()
 
 const { Blog, User } = require('../models')
+const { Op } = require('sequelize')
+
 const jwt = require('jsonwebtoken')
+const { sequelize } = require('../util/db')
 
 const blogFinder = async (req, res, next) => {
   console.log('etsin blogia id:llä', req.params.id);
@@ -31,11 +34,39 @@ const tokenExtractor = (req, res, next) => {
 // Modify the routes for retrieving all blogs and all users so that 
 // each blog shows the user who added it and each user shows the blogs they have added.
 router.get('/', async (req, res) => {
+  // 13.13 filtering
+  let where = {}
+  if (req.query.search) {
+    where = {
+      [Op.or]: [
+        {
+          title: {
+            [Op.iLike]: '%' + req.query.search + '%'
+          } 
+        },
+        {
+          author: {
+            [Op.iLike]: '%' + req.query.search + '%'
+          }
+        }
+    ]
+    }
+    /* where.title = {
+      [Op.iLike]: '%' + req.query.search + '%'
+    } 
+    where.author = {
+      [Op.iLike]: '%' + req.query.search + '%'
+    } */
+  }
+  console.log('MISSÄ PARAMETRI', where.title);
   const blogs = await Blog.findAll({
     include: { // join query
       model: User,
       attributes: { exclude: ['userId'] }
-    }
+    },
+    where,
+    // 13.15
+    order: sequelize.literal('likes DESC')
   })
   res.json(blogs)
 })
