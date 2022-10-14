@@ -2,7 +2,7 @@ const router = require('express').Router()
 
 const { Blog, User } = require('../models')
 const { Op } = require('sequelize')
-
+const { QueryTypes } = require('sequelize');
 const jwt = require('jsonwebtoken')
 const { sequelize } = require('../util/db')
 
@@ -51,14 +51,8 @@ router.get('/', async (req, res) => {
         }
     ]
     }
-    /* where.title = {
-      [Op.iLike]: '%' + req.query.search + '%'
-    } 
-    where.author = {
-      [Op.iLike]: '%' + req.query.search + '%'
-    } */
   }
-  console.log('MISSÄ PARAMETRI', where.title);
+
   const blogs = await Blog.findAll({
     include: { // join query
       model: User,
@@ -71,21 +65,27 @@ router.get('/', async (req, res) => {
   res.json(blogs)
 })
 
+
 router.post('/', tokenExtractor, async (req, res, next) => {
+  const headerToken = req.headers.authorization.substring(7)
+  const results = await sequelize.query(
+    `SELECT * FROM active_sessions WHERE token = '${headerToken}'`,
+    { type: QueryTypes.SELECT }
+  )
+
+  if (!results.length) {
+    throw Error('Error: token not found!')
+  }
   try {
-    console.log('decodedtoken: ',req.decodedToken);
     const user = await User.findByPk(req.decodedToken.id)
-    console.log(user);
     const blog = await Blog.create({ ...req.body, userId: user.id })
     res.json(blog)
   } catch(error) {
     next(error)
-    //return res.status(400).json({ error })
   }
 })
 
 router.get('/:id', blogFinder, async (req, res) => {
-  //const blog = await Blog.findByPk(req.params.id)
   if (req.blog) {
     res.json(req.blog)
   } else {
@@ -94,22 +94,23 @@ router.get('/:id', blogFinder, async (req, res) => {
 })
 
 router.delete('/:id', blogFinder, tokenExtractor, async (req, res, next) => {
-  //const blog = await Blog.findByPk(req.params.id)
+
+  const headerToken = req.headers.authorization.substring(7)
+  const results = await sequelize.query(
+    `SELECT * FROM active_sessions WHERE token = '${headerToken}'`,
+    { type: QueryTypes.SELECT }
+  )
+
+  if (!results.length) {
+    throw Error('Cannot delete blog because invalid token!')
+  }
   try {
-    console.log('decodedtoken: ',req.decodedToken);
-    console.log('blogi: ',req.blog);
-    /* const user = await User.findByPk(req.decodedToken.id)
-    console.log(user); */
     if (req.blog && req.blog.userId === req.decodedToken.id) {
-      console.log('okei!');
       await req.blog.destroy()
-      /* if (req.blog) {
-        await req.blog.destroy()
-      } */
       res.status(204).end()
     }
     else {
-      console.log('eipä ollu!');
+      console.log('incorrect token!');
       res.status(400).end()
     }
     

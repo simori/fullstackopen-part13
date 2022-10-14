@@ -30,8 +30,12 @@ module.exports = {
           max: 2022
         }
       },
-      createdAt: DataTypes.DATE,
-      updatedAt: DataTypes.DATE
+      read: {
+        type: DataTypes.BOOLEAN,
+        defaultValue: false
+      },
+      created_at: DataTypes.DATE,
+      updated_at: DataTypes.DATE
     }, {
       timestamps: true
     })
@@ -53,6 +57,10 @@ module.exports = {
         type: DataTypes.STRING,
         allowNull: false
       },
+      disabled: { // 13.24
+        type: DataTypes.BOOLEAN,
+        defaultValue: false
+      },
       created_at: DataTypes.DATE,
       updated_at: DataTypes.DATE
     }, {
@@ -68,6 +76,5 @@ module.exports = {
   down: async ({ context: queryInterface }) => {
     await queryInterface.dropTable('blogs')
     await queryInterface.dropTable('users')
-    await queryInterface.dropTable('migrations')
   },
 }
